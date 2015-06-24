@@ -18,12 +18,14 @@
 		p, h1 { margin: 11px; -webkit-font-smoothing: antialiased; }
 		a { color: #fff; font-weight: bold; text-decoration: none; border-bottom: 1px solid rgba(255,255,255,0.3); }
 		a:hover { color: #999; border-bottom: 1px solid rgba(255,255,255,1); }
-		#about {
+		.box {
 				background-color: rgba(0, 0, 0, 0.6);
-				display: inline-block;
+				display: block;
 				border-radius: 4px;
 				padding: 20px;
-				margin: 100px }
+				margin: 100px;
+				width: 300px;
+		}
 		@media (max-width: 767px) {
 			#monogram { position: relative; width: auto; padding: 20px; margin: 0; }
 			#about { position: relative; width: auto; padding: 20px; margin: 0 !important; }
@@ -33,11 +35,16 @@
 </head>
 
 <body>
-	<div id="about">
+	<div class="box" id="about">
 		<h1>David Taylor</h1>
-		<p><a href="http://twitter.com/davidtaylor">@davidtaylor</a></p>
-		<p><a href="http://github.com/dt">github.com/dt</a></p>
+		<p><a href="http://twitter.com/davidtaylor" target="_blank">@davidtaylor</a></p>
+		<p><a href="http://github.com/dt" target="_blank">github.com/dt</a></p>
 		<p><a href="/work.html">work</a></p>
+
+		<h2>Projects</h2>
+		<p><a href="https://www.icloud.com/sharedalbum/#A35oqs3qqFFXW" target="_blank">Brew Box</a></p>
+		<p><a href="https://medium.com/@davidt/connecting-our-coffee-maker-to-slack-bc6049e14ccc" target="_blank">Coffee slackbot</a></p>
+		<p><a href="https://docs.google.com/a/foursquare.com/spreadsheet/ccc?key=0Alb1vwfHsecgdDdFbUlkNW9DSWtpT1pSTHkzNV8zY2c&usp=drive_web#gid=0" target="_blank">Brew Log</a></p>
 	</div>
 
 	<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script>
