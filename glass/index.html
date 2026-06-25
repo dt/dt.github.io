@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UrbanGlass Slot Finder</title>
+<style>
+  :root{
+    --bg:#ffffff; --panel:#ffffff; --panel2:#ffffff; --line:#d8dee6;
+    --ink:#1d2733; --muted:#5c6b7a; --faint:#97a3b2;
+    --accent:#2563eb; --accent2:#1d4ed8; --accenttint:#eef3fe;
+    --great:#1f9d57; --good:#c08a12; --orange:#e0701a; --meh:#c9d1da;
+    --t1:#2563eb; --t2:#7c4dff; --t3:#c2306e;
+    --hot:#d6453f; --cool:#2f6df6;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  a{color:var(--accent)}
+  .wrap{max-width:1080px;margin:0 auto;padding:22px 22px 60px}
+  h1{margin:2px 0 18px;font-size:19px;font-weight:700;letter-spacing:.2px;text-align:center;color:var(--ink)}
+  .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .controls{margin:14px 0 10px}
+  select,button,input[type=number],input[type=text]{background:var(--panel2);color:var(--ink);
+    border:1px solid var(--line);border-radius:8px;padding:7px 11px;font:inherit;font-size:13px;height:34px}
+  select,button{cursor:pointer}
+  select:hover,button:hover,.field:hover,.chip:hover{border-color:#aab4c0}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  /* self-describing number field with inline unit + stepper */
+  .field{display:inline-flex;align-items:center;height:34px;border:1px solid var(--line);border-radius:8px;background:var(--panel2);overflow:hidden}
+  .field input[type=number]{border:0;height:auto;background:transparent;width:30px;padding:0 1px 0 11px;text-align:right;-moz-appearance:textfield}
+  .field input::-webkit-outer-spin-button,.field input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  .field .u{color:var(--faint);font-size:12px;padding:0 8px 0 3px}
+  .field .step{display:flex;flex-direction:column;height:100%;border-left:1px solid var(--line)}
+  .field .step button{border:0;border-radius:0;background:var(--panel2);height:16px;width:22px;padding:0;
+    font-size:8px;line-height:1;color:var(--muted);display:flex;align-items:center;justify-content:center}
+  .field .step button:first-child{border-bottom:1px solid var(--line)}
+  .field .step button:hover{background:var(--accenttint);color:var(--accent)}
+  /* check-chips (toggles) — neutral; only the ✓/✕ marker changes */
+  .chip{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 11px;border:1px solid var(--line);
+    border-radius:8px;background:var(--panel2);cursor:pointer;font-size:13px;color:var(--ink);user-select:none}
+  .chip input{display:none}
+  .chip::before{content:'✓';font-size:11px;font-weight:700;color:var(--accent)}
+  .chip:not(:has(input:checked)){color:var(--faint)}
+  .chip:not(:has(input:checked))::before{content:'✕';color:var(--faint)}
+  /* day prefs */
+  .dayrow{margin:0 0 16px;gap:8px}
+  .dayrow .lbl{color:var(--muted);font-size:13px}
+  .daychip{padding:4px 10px;border-radius:7px;border:1px solid var(--line);background:var(--panel2);
+    cursor:pointer;font-size:12px;user-select:none}
+  .daychip.preferred{border-color:var(--great);color:var(--great)}
+  .daychip.never{border-color:#e6b3b0;color:var(--faint);text-decoration:line-through}
+  .daychip.closed{opacity:.4;cursor:not-allowed}
+  .hint{color:var(--faint);font-size:11px}
+  /* modal */
+  .modal-backdrop{position:fixed;inset:0;background:rgba(20,28,40,.4);display:flex;align-items:center;justify-content:center;z-index:50}
+  .modal-backdrop[hidden]{display:none}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 22px;max-width:400px;width:90%;box-shadow:0 12px 40px rgba(20,28,40,.18)}
+  .modal h3{margin:0 0 6px;font-size:16px}
+  .status{font-size:13px;color:var(--muted)}
+  .status.err{color:var(--hot)}
+  .statusbar{margin-top:26px;font-size:13px;color:var(--faint)}
+  .statusbar a{color:var(--accent);text-decoration:none}
+  .statusbar a:hover{text-decoration:underline}
+  /* weather ribbon (compact) */
+  .wx{display:flex;gap:2px;overflow-x:auto;padding:2px 0 4px;margin:0 0 16px}
+  .wxd{flex:1 1 0;min-width:34px;text-align:center;line-height:1.25}
+  .wxd .hi{font-weight:700;font-size:13px}
+  .wxd .hi.g{color:var(--great)}.wxd .hi.y{color:var(--good)}.wxd .hi.o{color:var(--orange)}.wxd .hi.over{color:var(--hot)}
+  .wxd .emo{font-size:14px}
+  .wxd .dw{font-size:9px;color:var(--faint);text-transform:uppercase;letter-spacing:.4px}
+  .wxd .lo{font-size:10px;color:var(--faint);opacity:.75}
+  /* view toggle + list-only toolbar */
+  .toolbar{margin:0 0 14px;align-items:center}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+  .seg button{border:0;border-radius:0;background:var(--panel2);padding:0 12px;height:34px;color:var(--muted);
+    display:inline-flex;align-items:center;justify-content:center}
+  .seg button+button{border-left:1px solid var(--line)}
+  .seg button.active{background:var(--accent);color:#fff}
+  .seg svg{display:block}
+  .listctrls{margin-left:auto;gap:10px}
+  .listctrls.hide{display:none}
+  /* calendar */
+  .cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:7px}
+  .cal.calhead{margin-bottom:7px}
+  .calh{font-size:11px;color:var(--faint);text-align:center}
+  .calcell{min-height:178px;border:1px solid var(--line);border-radius:11px;padding:9px 11px;background:var(--panel);overflow:hidden}
+  .calcell.empty{border:none;background:transparent;min-height:0}
+  .calcell.dull{background:#eef1f5;color:var(--faint)}
+  .calcell.has{cursor:pointer}
+  .calcell.has:hover{border-color:#aab4c0}
+  .calcell.match{border-left:4px solid var(--meh)}
+  .calcell.match.g{border-left-color:var(--great)}
+  .calcell.match.y{border-left-color:var(--good)}
+  .calcell.match.o{border-left-color:var(--orange)}
+  .calcell.sel{outline:2px solid var(--accent);outline-offset:-1px}
+  .calcell .cd{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;color:var(--muted)}
+  .calcell .cdl{font-weight:600;color:var(--ink)}
+  .calcell.dull .cdl{color:var(--faint)}
+  .calcell .ct{font-size:20px;font-weight:800;line-height:1;margin:0}
+  .calcell .ct.g{color:var(--great)}.calcell .ct.y{color:var(--good)}.calcell .ct.o{color:var(--orange)}
+  .calcell .ct.over{color:var(--hot)}.calcell .ct.none{color:var(--faint);font-size:18px}
+  .calcell .ct.dim{color:var(--faint)}
+  .calcell .cslot{margin-top:7px}
+  .calcell .cs1{font-size:12px;font-weight:600;color:var(--ink)}
+  .calcell .cs1 b{font-weight:800}
+  .calcell .cs2{font-size:10.5px;color:var(--muted)}
+  .calcell .cmore{font-size:11px;color:var(--faint);margin-top:6px}
+  .calcell .cslot.up .cs1,.calcell .cslot.up .cs1 b{color:var(--muted);font-weight:600}
+  .calcell .cslot.up{opacity:.8}
+  .calcell .cwhy{font-size:12px;color:var(--faint);margin-top:8px}
+  .cdhead{font-weight:700;font-size:14px;margin-bottom:6px}
+  #caldetail{margin-top:12px;background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:12px 14px}
+  /* day groups */
+  .daygroup{margin:22px 0 8px;font-size:13px;color:var(--faint);text-transform:uppercase;letter-spacing:.6px}
+  /* cards */
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
+  .card{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--meh);
+    border-radius:12px;padding:11px 14px;cursor:pointer;transition:border-color .1s,box-shadow .1s}
+  .card:hover{border-color:#aab4c0;box-shadow:0 2px 10px rgba(20,28,40,.06)}
+  .card.great{border-left-color:var(--great)}
+  .card.good{border-left-color:var(--good)}
+  .card.orange{border-left-color:var(--orange)}
+  .chead{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+  .cday{font-size:15px;font-weight:700}
+  .cday .dom{color:var(--faint);font-weight:500;font-size:12px;margin-left:6px}
+  .ctemp{font-weight:800;font-size:19px;white-space:nowrap}
+  .ctemp.g{color:var(--great)}.ctemp.y{color:var(--good)}.ctemp.o{color:var(--orange)}.ctemp.over{color:var(--hot)}
+  .ctemp .lo{font-size:11px;color:var(--faint);font-weight:500;margin-left:4px}
+  .slot{margin-top:9px}
+  .slot .ctime{margin:2px 0 0}
+  .ctime{font-size:12.5px;color:var(--muted);margin:5px 0 7px}
+  .cres{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .chole{font-size:16px;font-weight:800}
+  .chole.t1{color:var(--t1)}.chole.t2{color:var(--t2)}.chole.t3{color:var(--t3)}
+  .cann{font-size:12.5px;color:var(--muted)}
+  .ccost{margin-left:auto;font-weight:700;font-size:13px}
+  .more{font-size:11px;color:var(--faint);margin-top:9px}
+  .detail{margin-top:9px;border-top:1px solid var(--line);padding-top:8px}
+  .opt{display:flex;gap:10px;align-items:baseline;font-size:12px;padding:3px 0;color:var(--muted)}
+  .opt .oh{font-weight:700;color:var(--ink);min-width:42px}
+  .opt .ot{min-width:128px}
+  .opt .oc{margin-left:auto}
+  .opt.no{opacity:.5}
+  .opt .tag{font-size:10px;color:var(--faint);border:1px solid var(--line);border-radius:5px;padding:0 4px;margin-left:6px}
+  .dbook{display:inline-block;margin-top:10px;font-size:12px;text-decoration:none;background:var(--accent);color:#fff;padding:5px 11px;border-radius:7px}
+  .dbook:hover{background:var(--accent2)}
+  .empty{color:var(--muted);padding:30px 0;text-align:center}
+  details.settings{margin-top:18px;color:var(--muted);font-size:13px}
+  details.settings textarea{width:100%;height:90px;background:#f1f4f8;color:var(--ink);
+    border:1px solid var(--line);border-radius:8px;margin-top:8px;font-family:ui-monospace,monospace;font-size:12px}
+  code{background:#eef1f5;padding:1px 5px;border-radius:4px;font-size:12px}
+  .pill{font-size:11px;color:var(--faint)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>UrbanGlass Hot Shop · Calendar Availability × Weather</h1>
+  <div class="wx" id="wx"></div>
+
+  <div class="row controls" id="filters">
+    <div class="seg">
+      <button id="vlist" class="active" title="List view" aria-label="List view">
+        <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="3" y1="4" x2="13" y2="4"/><line x1="3" y1="8" x2="13" y2="8"/><line x1="3" y1="12" x2="13" y2="12"/></svg>
+      </button>
+      <button id="vcal" title="Calendar view" aria-label="Calendar view">
+        <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="3.2" width="12" height="10.8" rx="1.6"/><line x1="2" y1="6.4" x2="14" y2="6.4"/><line x1="5" y1="1.8" x2="5" y2="4"/><line x1="11" y1="1.8" x2="11" y2="4"/></svg>
+      </button>
+    </div>
+    <span class="field"><input type="number" id="templimit" min="40" max="110" step="1"><span class="u">°F max</span><span class="step"><button type="button" id="tup" aria-label="warmer">▲</button><button type="button" id="tdn" aria-label="cooler">▼</button></span></span>
+    <select id="maxrate">
+      <option value="33" selected>GH ≤ $33/hr</option>
+      <option value="43">GH ≤ $43/hr</option>
+      <option value="999">all GH $</option>
+    </select>
+    <select id="minhrs">
+      <option value="3" selected>min 3 h</option>
+      <option value="4">min 4 h</option>
+      <option value="5">min 5 h</option>
+    </select>
+    <button id="daysbtn">Days…</button>
+    <label class="chip"><input type="checkbox" id="sharedann" checked> shared annealer</label>
+    <div class="row listctrls" id="listctrls">
+      <select id="sort">
+        <option value="default" selected>↕ best</option>
+        <option value="temp">↕ coolest</option>
+        <option value="price">↕ cheapest</option>
+        <option value="day">↕ by day</option>
+      </select>
+      <select id="horizon">
+        <option value="7">next 7 d</option>
+        <option value="14" selected>next 14 d</option>
+        <option value="21">next 21 d</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="daymodal" hidden>
+    <div class="modal">
+      <h3>Preferred days</h3>
+      <p class="hint">Click to cycle ok → ★ preferred → ✕ never.</p>
+      <div id="dayprefs" class="row" style="gap:6px;margin-top:10px"></div>
+      <div style="margin-top:16px;text-align:right"><button id="daydone">Done</button></div>
+    </div>
+  </div>
+
+  <div id="results"></div>
+
+  <div class="statusbar">
+    <span class="status" id="status">Loading…</span> · <a href="#" id="refresh">refresh</a>
+  </div>
+  <div class="pill" style="margin-top:6px">$/h reflects a 3 h booking including annealer.</div>
+
+  <details class="settings">
+    <summary>Settings &amp; troubleshooting</summary>
+    <p>This page reads the Checkfront calendar through our Google Apps Script web app
+       (<code>calendar-proxy.gs</code>), which serves the feed with CORS headers. If it ever fails to load,
+       download the ICS and use the manual fallback below.</p>
+    <p>Calendar source: <code id="icsurl"></code></p>
+    <p><input type="file" id="icsfile" accept=".ics,text/calendar"> &nbsp; or paste ICS:</p>
+    <textarea id="icspaste" placeholder="BEGIN:VCALENDAR …"></textarea>
+    <button id="loadpaste">Load pasted ICS</button>
+    <p><b>Default sort:</b> lowest forecast high → lowest price assuming a 3 hr reservation (so the flat annealer
+       cost is counted fairly) → non-EDU holes over EDU → preferred days. The Sort menu switches the primary key.</p>
+    <p class="pill">Glory holes priced $/hr, annealers flat per 24 hr (shared A4 = $20/side; from actual bookings).
+       The $/hr shown assumes a 3 hr booking so the flat annealer cost is spread. All settings are saved in this
+       browser. Verify on Checkfront.</p>
+  </details>
+</div>
+
+<script>
+//==================== CONFIG ====================
+const CONFIG = {
+  // Apps Script /exec endpoint that serves the calendar feed with CORS (see calendar-proxy.gs).
+  appsScriptUrl: "https://script.google.com/macros/s/AKfycbwmj_N5JS7Fic-Kcs06__bGdc6ph8BSD2X_yKB_XSRpbjpE-PWrwMzmecX3G0eguVcZ/exec",
+  calId: "115scvbdthv8elhr2ttkfp44gsintooi@import.calendar.google.com",
+  fetchTimeoutMs: 10000,
+  tz: "America/New_York",
+  weather: { lat: 40.6864, lon: -73.9772 },
+  defaultTempLimit: 82,
+  minHours: 3,
+  // studio hours per weekday (0=Sun..6=Sat); null = closed. Mon closed.
+  hours: { 0:[10,20], 1:null, 2:[9,20], 3:[9,20], 4:[9,20], 5:[9,20], 6:[10,20] },
+  // glory holes: $/hour
+  ghRate: { GH1:54, GH2:54, GH3:67.5, GH4:75.5, GH5:42.75, GH6:33, GH8:33, GH9:33, GH10:33 },
+  // annealers: $/24hr flat (shared A4 bills $20 per side; full A1–A3 $40; A8/A15 $44)
+  annRate: { A4:20, A1:40, A2:40, A3:40, A8:44, A15:44 },
+};
+CONFIG.icsUrl = "https://calendar.google.com/calendar/ical/" +
+  encodeURIComponent(CONFIG.calId) + "/public/basic.ics";
+
+const HR = 3600000, DAY = 86400000;
+const WD = { Sun:0, Mon:1, Tue:2, Wed:3, Thu:4, Fri:5, Sat:6 };
+const DAY_ABBR = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+//==================== PERSISTED PREFS ====================
+const LS = {
+  get(k,def){ try{ const v=localStorage.getItem('glass.'+k); return v==null?def:JSON.parse(v); }catch(e){ return def; } },
+  set(k,v){ try{ localStorage.setItem('glass.'+k, JSON.stringify(v)); }catch(e){} },
+};
+
+//==================== TZ HELPERS ====================
+function tzOffsetMs(date){
+  const parts = new Intl.DateTimeFormat('en-US',{timeZone:CONFIG.tz,hour12:false,
+    year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'}).formatToParts(date);
+  const m={}; parts.forEach(p=>m[p.type]=p.value);
+  if(m.hour==='24') m.hour='00';
+  return Date.UTC(+m.year,+m.month-1,+m.day,+m.hour,+m.minute,+m.second) - date.getTime();
+}
+function nyWall(y,mo,d,h,mi){ // epoch ms for a NY wall-clock time (mo is 1-based)
+  const guess = Date.UTC(y,mo-1,d,h,mi);
+  return guess - tzOffsetMs(new Date(guess));
+}
+function nyParts(ts){
+  const p = new Intl.DateTimeFormat('en-US',{timeZone:CONFIG.tz,hour12:false,weekday:'short',
+    year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}).formatToParts(new Date(ts));
+  const m={}; p.forEach(x=>m[x.type]=x.value); if(m.hour==='24')m.hour='00'; return m;
+}
+function nyDateStr(ts){ const p=nyParts(ts); return `${p.year}-${p.month}-${p.day}`; }
+function fmtTime(ts){
+  return new Intl.DateTimeFormat('en-US',{timeZone:CONFIG.tz,hour:'numeric',minute:'2-digit',hour12:true})
+    .format(new Date(ts)).replace(':00','');
+}
+function fmtDate(ts){
+  return new Intl.DateTimeFormat('en-US',{timeZone:CONFIG.tz,weekday:'short',month:'short',day:'numeric'})
+    .format(new Date(ts));
+}
+
+//==================== ICS PARSE ====================
+function unfold(t){ return t.replace(/\r\n/g,'\n').replace(/\n[ \t]/g,''); }
+function parseDt(val,params){
+  if(/VALUE=DATE/.test(params) && !/T/.test(val)){
+    return { allDay:true, y:+val.slice(0,4), mo:+val.slice(4,6), d:+val.slice(6,8) };
+  }
+  const m = val.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(Z)?$/);
+  if(!m) return null;
+  const [,y,mo,d,h,mi,s,z]=m;
+  return z ? { ts:Date.UTC(+y,+mo-1,+d,+h,+mi,+s) } : { ts:nyWall(+y,+mo,+d,+h,+mi) };
+}
+function parseEvents(text){
+  const blocks = unfold(text).split('BEGIN:VEVENT').slice(1);
+  const evs=[];
+  for(const b of blocks){
+    const body = b.split('END:VEVENT')[0];
+    const get = key => { const mm = body.match(new RegExp('^'+key+'([^:\\n]*):(.*)$','m'));
+      return mm ? {params:mm[1],val:mm[2].trim()} : null; };
+    const loc=get('LOCATION'), ds=get('DTSTART'), de=get('DTEND'), st=get('STATUS');
+    if(!loc||!ds) continue;
+    if(st && /CANCELLED/i.test(st.val)) continue;
+    const a=parseDt(ds.val,ds.params||''); if(!a) continue;
+    const c=de?parseDt(de.val,de.params||''):null;
+    let start,end;
+    if(a.allDay){ start=nyWall(a.y,a.mo,a.d,0,0); end=(c&&c.allDay)?nyWall(c.y,c.mo,c.d,0,0):start+DAY; }
+    else { start=a.ts; end=c?c.ts:start+HR; }
+    evs.push({loc:loc.val,start,end});
+  }
+  return evs;
+}
+
+//==================== INTERVALS ====================
+function subtract(win, busy){
+  let free=[[win[0],win[1]]];
+  for(const b of busy){
+    const next=[];
+    for(const f of free){
+      if(b[1]<=f[0]||b[0]>=f[1]){ next.push(f); continue; }
+      if(b[0]>f[0]) next.push([f[0],b[0]]);
+      if(b[1]<f[1]) next.push([b[1],f[1]]);
+    }
+    free=next.filter(f=>f[1]>f[0]);
+  }
+  return free;
+}
+function baseCode(loc){ const m=loc.match(/\b(GH\d+|A\d+)\b/); return m?m[1]:null; }
+
+//==================== ENGINE ====================
+function buildResources(events){
+  const busyByLoc=new Map(), instByCode={};
+  for(const e of events){
+    const code=baseCode(e.loc);
+    if(!code||(!(code in CONFIG.ghRate)&&!(code in CONFIG.annRate))) continue;
+    if(!busyByLoc.has(e.loc)) busyByLoc.set(e.loc,[]);
+    busyByLoc.get(e.loc).push([e.start,e.end]);
+    (instByCode[code]||(instByCode[code]=new Set())).add(e.loc);
+  }
+  const inst = code => instByCode[code] ? [...instByCode[code]] : [code];
+  const mk = (rates,cat) => Object.keys(rates).flatMap(c =>
+    inst(c).map(l => ({label:l, code:c, cat, rate:rates[c], edu:/\(EDU\)/i.test(l)})));
+  return { busyByLoc, gh:mk(CONFIG.ghRate,'gh'), ann:mk(CONFIG.annRate,'ann') };
+}
+
+function wxOf(p){ return STATE.weather ? STATE.weather[`${p.year}-${p.month}-${p.day}`] : null; }
+
+// All hole windows for one day, each paired with its cheapest allowed annealer.
+function dayOptions(R, p, w, minH, annPool, ghPool){
+  const hrs=CONFIG.hours[w]; if(!hrs) return [];
+  const win=[nyWall(+p.year,+p.month,+p.day,hrs[0],0), nyWall(+p.year,+p.month,+p.day,hrs[1],0)];
+  const free=label=>subtract(win, R.busyByLoc.get(label)||[]);
+  const out=[];
+  for(const gh of ghPool){
+    for(const fg of free(gh.label)){
+      if(fg[1]-fg[0] < minH*HR) continue;
+      let best=null;
+      for(const an of annPool){
+        for(const fa of free(an.label)){
+          const s=Math.max(fg[0],fa[0]), e=Math.min(fg[1],fa[1]);
+          if((e-s)/HR >= minH){ const c=gh.rate*3+an.rate; if(!best||c<best.c) best={an,s,e,c}; }
+        }
+      }
+      if(best) out.push({gh, an:best.an, s:best.s, e:best.e, len:(best.e-best.s)/HR});
+    }
+  }
+  return out;
+}
+
+// Per-day model: every day in the horizon with its options annotated match/non-match.
+// Build day objects for `count` days starting at `startTs`. Past days (before today
+// in NY) get no bookable options but keep their forecast for display.
+function computeDays(startTs, count){
+  const R=buildResources(STATE.events);
+  const minH=+$('minhrs').value, cap=+$('maxrate').value, limit=STATE.tempLimit;
+  const includeShared=$('sharedann').checked;
+  const annPool=R.ann.filter(a=>includeShared || a.code!=='A4');
+  const ghPool=R.gh;
+  const nextLimit = cap<33?33 : cap<43?43 : Infinity; // one GH-price tier above the cap
+  const todayStr=nyDateStr(Date.now());
+  const days=[];
+  for(let i=0;i<count;i++){
+    const p=nyParts(startTs+i*DAY), w=WD[p.weekday];
+    const dstr=`${p.year}-${p.month}-${p.day}`, past=dstr<todayStr;
+    const wx=STATE.weather?STATE.weather[dstr]:null;
+    const closed=!CONFIG.hours[w], pref=STATE.dayPrefs[w]||'ok';
+    const opts = (past||closed) ? [] : dayOptions(R,p,w,minH,annPool,ghPool);
+    for(const o of opts){
+      o.cost3=o.gh.rate*3+o.an.rate; o.reasons=[];
+      if(o.gh.rate>cap) o.reasons.push('$'+o.gh.rate+'/hr');
+      o.match = !o.reasons.length && !!wx && wx.hi<=limit && pref!=='never';
+    }
+    opts.sort((a,b)=> (b.match-a.match) || (a.cost3-b.cost3) || (a.s-b.s) || (a.gh.rate-b.gh.rate));
+    const matches=opts.filter(o=>o.match);
+    // "near": cheapest option that fails ONLY on price and is within one tier above the cap
+    let near=null;
+    if(!matches.length && !closed && !past && pref!=='never' && wx && wx.hi<=limit){
+      near=opts.find(o=>!o.match && o.reasons.length===1 && o.reasons[0][0]==='$' && o.gh.rate<=nextLimit)||null;
+    }
+    days.push({p, w, wx, closed, past, pref, opts, matches, near});
+  }
+  return days;
+}
+
+//==================== WEATHER ====================
+const WMO = { // code -> [emoji, text]
+  0:['☀️','Clear'],1:['🌤','Mostly clear'],2:['⛅','Partly cloudy'],3:['☁️','Overcast'],
+  45:['🌫','Fog'],48:['🌫','Fog'],51:['🌦','Drizzle'],53:['🌦','Drizzle'],55:['🌦','Drizzle'],
+  61:['🌧','Rain'],63:['🌧','Rain'],65:['🌧','Heavy rain'],66:['🌧','Freezing rain'],67:['🌧','Freezing rain'],
+  71:['🌨','Snow'],73:['🌨','Snow'],75:['🌨','Snow'],77:['🌨','Snow'],
+  80:['🌦','Showers'],81:['🌧','Showers'],82:['⛈','Heavy showers'],
+  85:['🌨','Snow showers'],86:['🌨','Snow showers'],
+  95:['⛈','Thunderstorm'],96:['⛈','Thunderstorm'],99:['⛈','Thunderstorm'],
+};
+async function fetchWeather(){
+  const u = `https://api.open-meteo.com/v1/forecast?latitude=${CONFIG.weather.lat}`+
+    `&longitude=${CONFIG.weather.lon}&daily=temperature_2m_max,temperature_2m_min,weathercode`+
+    `&temperature_unit=fahrenheit&timezone=${encodeURIComponent(CONFIG.tz)}&forecast_days=16&past_days=7`;
+  const r = await fetchWithTimeout(u, CONFIG.fetchTimeoutMs);
+  if(!r.ok) throw new Error('weather '+r.status);
+  const j = await r.json();
+  const map={};
+  j.daily.time.forEach((d,i)=>{
+    map[d] = { hi:Math.round(j.daily.temperature_2m_max[i]),
+               lo:Math.round(j.daily.temperature_2m_min[i]),
+               code:j.daily.weathercode[i] };
+  });
+  return map;
+}
+// classify a high temp against the user's limit: green 3°+ under, yellow 1–2° under, orange at, over above.
+function wxBand(hi, limit){
+  if(hi > limit) return 'over';
+  if(hi <= limit-3) return 'g';
+  if(hi <= limit-1) return 'y';
+  return 'o';
+}
+
+//==================== CORS FETCH ====================
+async function fetchWithTimeout(url, ms){
+  const ctl=new AbortController(); const t=setTimeout(()=>ctl.abort(), ms);
+  try { return await fetch(url,{signal:ctl.signal}); } finally { clearTimeout(t); }
+}
+async function fetchICS(){
+  if(!CONFIG.appsScriptUrl) throw new Error('no calendar source configured');
+  const r = await fetchWithTimeout(CONFIG.appsScriptUrl, CONFIG.fetchTimeoutMs);
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  const txt = await r.text();
+  if(!txt.includes('BEGIN:VCALENDAR')) throw new Error('response was not a calendar feed');
+  return txt;
+}
+
+//==================== RENDER ====================
+const $ = id => document.getElementById(id);
+const STATE = {
+  events:null, weather:null,
+  view: LS.get('view', 'list'),
+  tempLimit: LS.get('tempLimit', CONFIG.defaultTempLimit),
+  dayPrefs: LS.get('dayPrefs', {0:'ok',1:'ok',2:'ok',3:'ok',4:'ok',5:'ok',6:'ok'}),
+};
+
+// effective $/hr assuming a 3 h booking (flat annealer cost spread over 3 h)
+function cost(slot){
+  return `$${Math.round(slot.gh.rate + slot.an.rate/3)}/hr`;
+}
+function ghBand(r){ return r<=33?'t1':(r<=50?'t2':'t3'); }
+function annBand(r){ return r<=20?'t1':(r<=44?'t2':'t3'); }
+const CARD_CLS = { g:'great', y:'good', o:'orange', over:'meh' };
+
+// ── sort keys ──────────────────────────────────────────────
+// fair $ assumes a 3h reservation so the flat annealer cost is captured fairly.
+const fairCost = s => s.gh.rate*3 + s.an.rate;
+const eduRank  = s => (s.gh.edu ? 1 : 0);
+const dayRank  = s => (STATE.dayPrefs[s.weekday]==='preferred' ? 0 : 1);
+const byTemp=(a,b)=>a.wx.hi-b.wx.hi, byFair=(a,b)=>fairCost(a)-fairCost(b),
+      byEdu=(a,b)=>eduRank(a)-eduRank(b), byDay=(a,b)=>dayRank(a)-dayRank(b), bySoon=(a,b)=>a.s-b.s;
+const chain = (...cs) => (a,b)=>{ for(const c of cs){ const r=c(a,b); if(r) return r; } return 0; };
+const SORTS = {
+  default: chain(byTemp, byFair, byEdu, byDay, bySoon), // coolest → cheapest@3h → non-EDU → preferred day
+  temp:    chain(byTemp, byFair, bySoon),
+  price:   chain(byFair, byTemp, bySoon),
+  day:     chain(byDay, byTemp, byFair, bySoon),
+};
+
+function renderDayPrefs(){
+  const el=$('dayprefs'); el.innerHTML='';
+  let nPref=0, nNever=0;
+  for(let w=0;w<7;w++){
+    const closed = !CONFIG.hours[w];
+    const st = STATE.dayPrefs[w]||'ok';
+    if(!closed && st==='preferred') nPref++;
+    if(!closed && st==='never') nNever++;
+    const chip=document.createElement('span');
+    chip.className='daychip '+(closed?'closed':st);
+    chip.textContent = DAY_ABBR[w] + (closed?' ·closed':(st==='preferred'?' ★':(st==='never'?' ✕':'')));
+    if(!closed) chip.addEventListener('click',()=>{
+      const cur=STATE.dayPrefs[w]||'ok';
+      STATE.dayPrefs[w] = cur==='ok'?'preferred':(cur==='preferred'?'never':'ok');
+      LS.set('dayPrefs', STATE.dayPrefs);
+      renderDayPrefs(); renderSlots();
+    });
+    el.appendChild(chip);
+  }
+  $('daysbtn').textContent = 'Days' + (nPref?` · ${nPref}★`:'') + (nNever?` · ${nNever}✕`:'') + (nPref||nNever?'':'…');
+}
+
+function renderWeather(map){
+  const el=$('wx'); el.innerHTML='';
+  if(!map) return;
+  const limit=STATE.tempLimit, today=nyDateStr(Date.now());
+  for(const k of Object.keys(map).sort()){
+    if(k<today) continue;                       // ribbon is forecast-only; past days are for the calendar
+    const wx=map[k]; const [emo]=WMO[wx.code]||['',''];
+    const ts=nyWall(+k.slice(0,4),+k.slice(5,7),+k.slice(8,10),12,0);
+    const dw=new Intl.DateTimeFormat('en-US',{timeZone:CONFIG.tz,weekday:'short'}).format(new Date(ts));
+    const d=document.createElement('div'); d.className='wxd';
+    d.innerHTML=`<div class="hi ${wxBand(wx.hi,limit)}">${wx.hi}°</div>`+
+      `<div class="emo">${emo}</div><div class="dw">${dw}</div><div class="lo">${wx.lo}°</div>`;
+    el.appendChild(d);
+  }
+}
+
+const annName = a => a.code==='A4' ? 'Shared' : a.code;
+
+function renderSlots(){
+  if(!STATE.events) return;
+  const res=$('results'); res.innerHTML='';
+  const now=Date.now();
+  if(STATE.view==='cal'){
+    const w0=WD[nyParts(now).weekday];                 // align to Sunday of current week
+    renderCalendar(res, computeDays(now - w0*DAY, 21)); // always 3 week-rows
+  } else {
+    renderList(res, computeDays(now, +$('horizon').value));
+  }
+}
+
+// representative slot for sorting a day by its best matching option
+function rep(d){ const m=d.matches[0]; return {gh:m.gh, an:m.an, s:m.s, e:m.e, len:m.len, wx:d.wx, weekday:d.w}; }
+
+function renderList(res, days){
+  const minH=+$('minhrs').value;
+  const hits=days.filter(d=>d.matches.length);
+  hits.sort((A,B)=>(SORTS[$('sort').value]||SORTS.default)(rep(A),rep(B)));
+  if(!hits.length){ res.innerHTML='<div class="empty">No matching days. Loosen temp, raise $/hr, lower min length, or re-enable days.</div>'; setStatus('0 days'); return; }
+  const grid=document.createElement('div'); grid.className='cards';
+  hits.forEach(d=>grid.appendChild(dayCard(d,minH)));
+  res.appendChild(grid);
+  setStatus(`${hits.length} day${hits.length===1?'':'s'} with options · loaded ${new Date().toLocaleTimeString()}`);
+}
+
+function moreLabel(n){ return n>0 ? `${n} more option${n>1?'s':''}` : 'all options'; }
+function slotHTML(m){
+  return `<div class="slot"><div class="cres"><span class="chole ${ghBand(m.gh.rate)}">🔥 ${m.gh.code}</span>`+
+    `<span class="cann">🧊 ${annName(m.an)}</span><span class="ccost">${cost(m)}</span></div>`+
+    `<div class="ctime">${fmtTime(m.s)} – ${fmtTime(m.e)} · ${m.len|0}h</div></div>`;
+}
+
+function dayCard(d, minH){
+  const band=wxBand(d.wx.hi, STATE.tempLimit);
+  const [emo]=WMO[d.wx.code]||['',''];
+  const nMore=d.matches.length-2;
+  const card=document.createElement('div'); card.className='card '+CARD_CLS[band];
+  card.innerHTML=
+    `<div class="chead"><div class="cday">${DAY_ABBR[d.w]}<span class="dom">${+d.p.month}/${+d.p.day}</span></div>`+
+    `<div class="ctemp ${band}">${emo} ${d.wx.hi}°</div></div>`+
+    d.matches.slice(0,2).map(slotHTML).join('')+
+    `<div class="more">▾ ${moreLabel(nMore)}</div>`+
+    `<div class="detail" hidden>${detailHTML(d,minH)}</div>`;
+  card.addEventListener('click', e=>{
+    if(e.target.closest('a')) return;
+    const det=card.querySelector('.detail');
+    det.hidden=!det.hidden;
+    card.querySelector('.more').textContent=(det.hidden?'▾ ':'▴ ')+moreLabel(nMore);
+  });
+  return card;
+}
+
+function detailHTML(d, minH){
+  const rows=d.opts.map(o=>{
+    const tag=o.match?'':`<span class="tag">${o.reasons.join(', ')}</span>`;
+    return `<div class="opt ${o.match?'':'no'}"><span class="oh">${o.gh.code}</span>`+
+      `<span class="ot">${fmtTime(o.s)}–${fmtTime(o.e)} · ${o.len|0}h</span>`+
+      `<span>🧊 ${annName(o.an)}</span><span class="oc">${cost(o,minH)}</span>${tag}</div>`;
+  }).join('');
+  return rows+`<a class="dbook" href="https://urbanglass.checkfront.com/" target="_blank" rel="noopener">Book on Checkfront ›</a>`;
+}
+
+function renderCalendar(res, days){
+  const limit=STATE.tempLimit, minH=+$('minhrs').value;
+  const head=document.createElement('div'); head.className='cal calhead';
+  DAY_ABBR.forEach(x=>{ const c=document.createElement('div'); c.className='calh'; c.textContent=x; head.appendChild(c); });
+  res.appendChild(head);
+  const grid=document.createElement('div'); grid.className='cal'; res.appendChild(grid);
+  const detail=document.createElement('div'); detail.id='caldetail'; detail.hidden=true; res.appendChild(detail);
+
+  const firstW=days.length?days[0].w:0;
+  for(let i=0;i<firstW;i++){ const e=document.createElement('div'); e.className='calcell empty'; grid.appendChild(e); }
+  let hits=0;
+  for(const d of days){
+    const wx=d.wx, band=wx?wxBand(wx.hi,limit):null;
+    const [emo]=wx?(WMO[wx.code]||['','']):['',''];
+    const cell=document.createElement('div');
+    const head2=`<div class="cd"><span class="cdl">${DAY_ABBR[d.w]} ${+d.p.day} ${emo}</span>`;
+    if(d.matches.length){
+      hits++;
+      const slots=d.matches.slice(0,2).map(m=>
+        `<div class="cslot"><div class="cs1"><b>${m.gh.code}</b> + ${m.an.code==='A4'?'Shr':m.an.code} · ${m.len|0}h</div>`+
+        `<div class="cs2">${fmtTime(m.s)}–${fmtTime(m.e)} · ${cost(m)}</div></div>`).join('');
+      const nMore=d.matches.length-2;
+      const more=nMore>0?`<div class="cmore">+ ${nMore} option${nMore>1?'s':''}</div>`:'';
+      cell.className='calcell has match '+band;
+      cell.innerHTML=head2+`<span class="ct ${band}">${wx.hi}°</span></div>`+slots+more;
+    } else if(d.near){
+      const m=d.near, an=m.an.code==='A4'?'Shr':m.an.code;
+      cell.className='calcell has dull';
+      cell.innerHTML=head2+`<span class="ct ${band}">${wx.hi}°</span></div>`+
+        `<div class="cslot up"><div class="cs1"><b>${m.gh.code}</b> + ${an} · ${m.len|0}h</div>`+
+        `<div class="cs2">${fmtTime(m.s)}–${fmtTime(m.e)} · ${cost(m)}</div></div>`;
+    } else {
+      // "available" = something is actually free that day, just not a match (e.g. too hot) — keep temp colored
+      const free=!d.closed && !d.past && d.pref!=='never' && d.opts.length>0;
+      const why=d.past?'':(d.closed?'closed':(d.pref==='never'?'off':(wx&&wx.hi>limit?'too warm':(!wx?'no forecast':'booked'))));
+      cell.className='calcell dull'+(d.opts.length?' has':'')+(d.past?' past':'');
+      cell.innerHTML=head2+
+        (wx?`<span class="ct ${free?band:'dim'}">${wx.hi}°</span>`:`<span class="ct none">—</span>`)+`</div>`+
+        (why?`<div class="cwhy">${why}</div>`:'');
+    }
+    if(d.opts.length){
+      cell.addEventListener('click',()=>{
+        grid.querySelectorAll('.calcell.sel').forEach(c=>c.classList.remove('sel'));
+        cell.classList.add('sel');
+        detail.hidden=false;
+        detail.innerHTML=`<div class="cdhead">${DAY_ABBR[d.w]} ${+d.p.month}/${+d.p.day}${wx?` · hi ${wx.hi}°`:''}</div>`+detailHTML(d,minH);
+        detail.scrollIntoView({behavior:'smooth',block:'nearest'});
+      });
+    }
+    grid.appendChild(cell);
+  }
+  setStatus(`${hits} day${hits===1?'':'s'} with options · loaded ${new Date().toLocaleTimeString()}`);
+}
+
+function applyView(){
+  $('vlist').classList.toggle('active', STATE.view==='list');
+  $('vcal').classList.toggle('active', STATE.view==='cal');
+  $('listctrls').classList.toggle('hide', STATE.view!=='list');
+}
+
+//==================== LOAD ====================
+function setStatus(msg,err){ const s=$('status'); s.textContent=msg; s.className='status'+(err?' err':''); }
+
+async function load(){
+  setStatus('Loading calendar + forecast…');
+  $('icsurl').textContent=CONFIG.icsUrl;
+  const wxP = fetchWeather().then(m=>{STATE.weather=m; renderWeather(m);})
+    .catch(e=>{ console.warn('weather failed',e); STATE.weather=null; });
+  try{
+    const ics = await fetchICS();
+    STATE.events = parseEvents(ics);
+    await wxP;
+    renderSlots();
+  }catch(e){
+    await wxP;
+    console.error(e);
+    setStatus('Could not load the calendar ('+e.message+'). Use Settings below to paste or upload the .ics file.', true);
+  }
+}
+function loadFromText(txt){
+  try{
+    STATE.events=parseEvents(txt);
+    if(!STATE.events.length){ setStatus('No events parsed from that ICS.',true); return; }
+    renderSlots();
+  }catch(e){ setStatus('Parse error: '+e.message,true); }
+}
+
+//==================== WIRE UP ====================
+// remember every control across sessions
+['sort','horizon','maxrate','minhrs'].forEach(id=>{
+  const v=LS.get('ctl.'+id,null); if(v!=null) $(id).value=v;
+  $(id).addEventListener('change',()=>{ LS.set('ctl.'+id,$(id).value); renderSlots(); });
+});
+{ const v=LS.get('ctl.sharedann',null); if(v!=null) $('sharedann').checked=v;
+  $('sharedann').addEventListener('change',()=>{ LS.set('ctl.sharedann',$('sharedann').checked); renderSlots(); }); }
+$('vlist').addEventListener('click', ()=>{ STATE.view='list'; LS.set('view','list'); applyView(); renderSlots(); });
+$('vcal').addEventListener('click', ()=>{ STATE.view='cal'; LS.set('view','cal'); applyView(); renderSlots(); });
+function setTemp(v){
+  v=Math.max(40,Math.min(110,v|0));
+  STATE.tempLimit=v; $('templimit').value=v; LS.set('tempLimit',v);
+  renderWeather(STATE.weather); renderSlots();
+}
+$('templimit').value = STATE.tempLimit;
+$('templimit').addEventListener('change', ()=>{ const v=parseInt($('templimit').value,10); if(!isNaN(v)) setTemp(v); });
+$('tup').addEventListener('click', ()=>setTemp(STATE.tempLimit+1));
+$('tdn').addEventListener('click', ()=>setTemp(STATE.tempLimit-1));
+$('daysbtn').addEventListener('click', ()=> $('daymodal').hidden=false);
+$('daydone').addEventListener('click', ()=> $('daymodal').hidden=true);
+$('daymodal').addEventListener('click', e=>{ if(e.target===$('daymodal')) $('daymodal').hidden=true; });
+$('refresh').addEventListener('click', e=>{ e.preventDefault(); load(); });
+$('icsfile').addEventListener('change', e=>{ const f=e.target.files[0]; if(f) f.text().then(loadFromText); });
+$('loadpaste').addEventListener('click', ()=>{ const t=$('icspaste').value.trim(); if(t) loadFromText(t); });
+
+renderDayPrefs();
+applyView();
+load();
+</script>
+</body>
+</html>
