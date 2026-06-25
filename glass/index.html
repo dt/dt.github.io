@@ -199,9 +199,14 @@
 
   <div class="modal-backdrop" id="daymodal" hidden>
     <div class="modal">
-      <h3>Preferred days</h3>
-      <p class="hint">Click to cycle ok → ★ preferred → ✕ never.</p>
-      <div id="dayprefs" class="row" style="gap:6px;margin-top:10px"></div>
+      <h3>Days</h3>
+      <div class="seg" id="dayseg">
+        <button data-mode="weekends">Weekends</button>
+        <button data-mode="weekdays">Weekdays</button>
+        <button data-mode="choose">Choose days</button>
+      </div>
+      <p class="hint" style="margin-top:10px">In “Choose days”, click a day to cycle ok → ★ preferred → ✕ never.</p>
+      <div id="dayprefs" class="row" style="gap:6px;margin-top:8px"></div>
       <div style="margin-top:16px;text-align:right"><button id="daydone">Done</button></div>
     </div>
   </div>
@@ -212,7 +217,7 @@
     <span class="status" id="status">Loading…</span>
     <button id="gear" class="gear" title="Settings &amp; troubleshooting" aria-label="Settings">⚙</button>
   </div>
-  <div class="pill" style="margin-top:6px">$/h reflects a 3 h booking including annealer.</div>
+  <div class="pill" style="margin-top:6px">$/h reflects a 3 h booking including the cheapest available annealer.</div>
 
   <div id="settings" class="settings" hidden>
     <p>Reads the public Checkfront calendar via a Google Apps Script proxy (see <code>calendar-proxy.gs</code>;
@@ -473,6 +478,7 @@ const STATE = {
   events:null, weather:null, loadedTs:0, loadedAt:'',
   view: LS.get('view', 'list'),
   tempLimit: LS.get('tempLimit', CONFIG.defaultTempLimit),
+  dayMode: LS.get('dayMode', 'choose'),
   dayPrefs: LS.get('dayPrefs', {0:'ok',1:'ok',2:'ok',3:'ok',4:'ok',5:'ok',6:'ok'}),
 };
 
@@ -499,6 +505,17 @@ const SORTS = {
   day:     chain(byDay, byTemp, byFair, bySoon),
 };
 
+// Weekends / Weekdays presets bulk-set ok/never; "Choose days" reveals per-day chips.
+function setDayMode(m){
+  STATE.dayMode=m; LS.set('dayMode',m);
+  if(m==='weekends' || m==='weekdays'){
+    const keep = m==='weekends' ? [0,6] : [2,3,4,5];
+    for(let w=0;w<7;w++){ if(!CONFIG.hours[w]) continue; STATE.dayPrefs[w]=keep.includes(w)?'ok':'never'; }
+    LS.set('dayPrefs', STATE.dayPrefs);
+  }
+  renderDayPrefs(); renderSlots();
+}
+
 function renderDayPrefs(){
   const el=$('dayprefs'); el.innerHTML='';
   let nPref=0, nNever=0;
@@ -518,7 +535,15 @@ function renderDayPrefs(){
     });
     el.appendChild(chip);
   }
-  $('daysbtn').textContent = 'Days' + (nPref?` · ${nPref}★`:'') + (nNever?` · ${nNever}✕`:'') + (nPref||nNever?'':'…');
+  const mode=STATE.dayMode;
+  const seg=$('dayseg');
+  if(seg) ['weekends','weekdays','choose'].forEach(m=>{
+    const b=seg.querySelector(`button[data-mode="${m}"]`); if(b) b.classList.toggle('active', m===mode);
+  });
+  el.style.display = mode==='choose' ? 'flex' : 'none';
+  $('daysbtn').textContent = mode==='weekends' ? 'Weekends'
+    : mode==='weekdays' ? 'Weekdays'
+    : 'Days' + (nPref?` · ${nPref}★`:'') + (nNever?` · ${nNever}✕`:'');
 }
 
 function renderWeather(map){
@@ -711,6 +736,7 @@ $('templimit').addEventListener('change', ()=>{ const v=parseInt($('templimit').
 $('tup').addEventListener('click', ()=>setTemp(STATE.tempLimit+1));
 $('tdn').addEventListener('click', ()=>setTemp(STATE.tempLimit-1));
 $('daysbtn').addEventListener('click', ()=> $('daymodal').hidden=false);
+$('dayseg').addEventListener('click', e=>{ const b=e.target.closest('button'); if(b) setDayMode(b.dataset.mode); });
 $('daydone').addEventListener('click', ()=> $('daymodal').hidden=true);
 $('daymodal').addEventListener('click', e=>{ if(e.target===$('daymodal')) $('daymodal').hidden=true; });
 $('gear').addEventListener('click', ()=>{ const s=$('settings'); s.hidden=!s.hidden; });
