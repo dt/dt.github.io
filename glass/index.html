@@ -181,7 +181,6 @@
       <option value="5">min 5 h</option>
     </select>
     <button id="daysbtn">Days…</button>
-    <label class="chip"><input type="checkbox" id="sharedann" checked> shared annealer</label>
     <div class="row listctrls" id="listctrls">
       <select id="sort">
         <option value="default" selected>↕ best</option>
@@ -215,20 +214,8 @@
 
   <div class="statusbar">
     <span class="status" id="status">Loading…</span>
-    <button id="gear" class="gear" title="Settings &amp; troubleshooting" aria-label="Settings">⚙</button>
   </div>
   <div class="pill" style="margin-top:6px">$/h reflects a 3 h booking including the cheapest available annealer.</div>
-
-  <div id="settings" class="settings" hidden>
-    <p>Reads the public Checkfront calendar via a Google Apps Script proxy (see <code>calendar-proxy.gs</code>;
-       setup steps are in the page source). If it ever fails to load, upload or paste the <code>.ics</code> below.</p>
-    <p>Source: <code id="icsurl"></code></p>
-    <p><input type="file" id="icsfile" accept=".ics,text/calendar"> &nbsp; or paste ICS:</p>
-    <textarea id="icspaste" placeholder="BEGIN:VCALENDAR …"></textarea>
-    <button id="loadpaste">Load pasted ICS</button>
-    <p class="pill">Glory holes priced $/hr; annealers flat per 24 hr (shared A4 = $20/side). $/hr assumes a 3 hr
-       booking so the flat annealer cost is spread. All settings are saved in this browser. Auto-refreshes hourly.</p>
-  </div>
 </div>
 
 <script>
@@ -396,8 +383,7 @@ function dayOptions(R, p, w, minH, annPool, ghPool){
 function computeDays(startTs, count){
   const R=buildResources(STATE.events);
   const minH=+$('minhrs').value, cap=+$('maxrate').value, limit=STATE.tempLimit;
-  const includeShared=$('sharedann').checked;
-  const annPool=R.ann.filter(a=>includeShared || a.code!=='A4');
+  const annPool=R.ann;          // always consider all annealers (shared A4 is cheapest)
   const ghPool=R.gh;
   const nextLimit = cap<33?33 : cap<43?43 : Infinity; // one GH-price tier above the cap
   const todayStr=nyDateStr(Date.now());
@@ -692,7 +678,6 @@ function setStatus(msg,err){ const s=$('status'); s.textContent=msg; s.className
 
 async function load(){
   setStatus('Loading calendar + forecast…');
-  $('icsurl').textContent=CONFIG.icsUrl;
   const wxP = fetchWeather().then(m=>{STATE.weather=m; renderWeather(m);})
     .catch(e=>{ console.warn('weather failed',e); STATE.weather=null; });
   try{
@@ -704,7 +689,7 @@ async function load(){
   }catch(e){
     await wxP;
     console.error(e);
-    setStatus('Could not load the calendar ('+e.message+'). Open ⚙ to paste or upload the .ics file.', true);
+    setStatus('Could not load the calendar ('+e.message+'). Reload to retry.', true);
   }
 }
 function loadFromText(txt){
@@ -722,8 +707,6 @@ function loadFromText(txt){
   const v=LS.get('ctl.'+id,null); if(v!=null) $(id).value=v;
   $(id).addEventListener('change',()=>{ LS.set('ctl.'+id,$(id).value); renderSlots(); });
 });
-{ const v=LS.get('ctl.sharedann',null); if(v!=null) $('sharedann').checked=v;
-  $('sharedann').addEventListener('change',()=>{ LS.set('ctl.sharedann',$('sharedann').checked); renderSlots(); }); }
 $('vlist').addEventListener('click', ()=>{ STATE.view='list'; LS.set('view','list'); applyView(); renderSlots(); });
 $('vcal').addEventListener('click', ()=>{ STATE.view='cal'; LS.set('view','cal'); applyView(); renderSlots(); });
 function setTemp(v){
@@ -739,10 +722,6 @@ $('daysbtn').addEventListener('click', ()=> $('daymodal').hidden=false);
 $('dayseg').addEventListener('click', e=>{ const b=e.target.closest('button'); if(b) setDayMode(b.dataset.mode); });
 $('daydone').addEventListener('click', ()=> $('daymodal').hidden=true);
 $('daymodal').addEventListener('click', e=>{ if(e.target===$('daymodal')) $('daymodal').hidden=true; });
-$('gear').addEventListener('click', ()=>{ const s=$('settings'); s.hidden=!s.hidden; });
-$('icsfile').addEventListener('change', e=>{ const f=e.target.files[0]; if(f) f.text().then(loadFromText); });
-$('loadpaste').addEventListener('click', ()=>{ const t=$('icspaste').value.trim(); if(t) loadFromText(t); });
-
 // auto-refresh the data once it's older than an hour (checked each minute); otherwise the
 // user can just reload the page. No manual refresh button.
 setInterval(()=>{ if(STATE.loadedTs && Date.now()-STATE.loadedTs >= 3600000) load(); }, 60000);
