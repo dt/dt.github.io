@@ -200,9 +200,10 @@
     <div class="modal">
       <h3>Days</h3>
       <div class="seg" id="dayseg">
+        <button data-mode="any">Any day</button>
         <button data-mode="weekends">Weekends</button>
         <button data-mode="weekdays">Weekdays</button>
-        <button data-mode="choose">Choose days</button>
+        <button data-mode="choose">Choose</button>
       </div>
       <p class="hint" style="margin-top:10px">In “Choose days”, click a day to cycle ok → ★ preferred → ✕ never.</p>
       <div id="dayprefs" class="row" style="gap:6px;margin-top:8px"></div>
@@ -256,6 +257,17 @@ CONFIG.icsUrl = "https://calendar.google.com/calendar/ical/" +
 const HR = 3600000, DAY = 86400000;
 const WD = { Sun:0, Mon:1, Tue:2, Wed:3, Thu:4, Fri:5, Sat:6 };
 const DAY_ABBR = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const DAY_ORDER = [2,3,4,5,6,0]; // studio week, Tue→Sun (Mon closed)
+// compact label for a set of included weekdays, e.g. "Tue–Sun" or "Tue–Thu, Sat–Sun"
+function fmtDayRanges(included){
+  const seq=DAY_ORDER.filter(w=>included.has(w));
+  if(!seq.length) return 'no days';
+  if(seq.length===DAY_ORDER.length) return DAY_ABBR[DAY_ORDER[0]]+'–'+DAY_ABBR[DAY_ORDER[DAY_ORDER.length-1]];
+  const idx=w=>DAY_ORDER.indexOf(w), runs=[]; let a=seq[0], p=seq[0];
+  for(let i=1;i<seq.length;i++){ if(idx(seq[i])===idx(p)+1){ p=seq[i]; } else { runs.push([a,p]); a=p=seq[i]; } }
+  runs.push([a,p]);
+  return runs.map(([s,e])=> s===e?DAY_ABBR[s]:`${DAY_ABBR[s]}–${DAY_ABBR[e]}`).join(', ');
+}
 
 //==================== PERSISTED PREFS ====================
 const LS = {
@@ -464,7 +476,7 @@ const STATE = {
   events:null, weather:null, loadedTs:0, loadedAt:'',
   view: LS.get('view', 'list'),
   tempLimit: LS.get('tempLimit', CONFIG.defaultTempLimit),
-  dayMode: LS.get('dayMode', 'choose'),
+  dayMode: LS.get('dayMode', 'any'),
   dayPrefs: LS.get('dayPrefs', {0:'ok',1:'ok',2:'ok',3:'ok',4:'ok',5:'ok',6:'ok'}),
 };
 
@@ -494,8 +506,8 @@ const SORTS = {
 // Weekends / Weekdays presets bulk-set ok/never; "Choose days" reveals per-day chips.
 function setDayMode(m){
   STATE.dayMode=m; LS.set('dayMode',m);
-  if(m==='weekends' || m==='weekdays'){
-    const keep = m==='weekends' ? [0,6] : [2,3,4,5];
+  if(m!=='choose'){
+    const keep = m==='any' ? [0,2,3,4,5,6] : m==='weekends' ? [0,6] : [2,3,4,5];
     for(let w=0;w<7;w++){ if(!CONFIG.hours[w]) continue; STATE.dayPrefs[w]=keep.includes(w)?'ok':'never'; }
     LS.set('dayPrefs', STATE.dayPrefs);
   }
@@ -523,13 +535,16 @@ function renderDayPrefs(){
   }
   const mode=STATE.dayMode;
   const seg=$('dayseg');
-  if(seg) ['weekends','weekdays','choose'].forEach(m=>{
+  if(seg) ['any','weekends','weekdays','choose'].forEach(m=>{
     const b=seg.querySelector(`button[data-mode="${m}"]`); if(b) b.classList.toggle('active', m===mode);
   });
   el.style.display = mode==='choose' ? 'flex' : 'none';
-  $('daysbtn').textContent = mode==='weekends' ? 'Weekends'
+  const included=new Set();
+  for(let w=0;w<7;w++){ if(!CONFIG.hours[w]) continue; if((STATE.dayPrefs[w]||'ok')!=='never') included.add(w); }
+  $('daysbtn').textContent = mode==='any' ? 'Any day'
+    : mode==='weekends' ? 'Weekends'
     : mode==='weekdays' ? 'Weekdays'
-    : 'Days' + (nPref?` · ${nPref}★`:'') + (nNever?` · ${nNever}✕`:'');
+    : fmtDayRanges(included);
 }
 
 function renderWeather(map){
